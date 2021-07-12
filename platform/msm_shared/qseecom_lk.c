@@ -44,6 +44,8 @@
 
 #define QSEOS_CHECK_VERSION_CMD  0x00001803
 
+#define ENABLE_TZ_LOGGING 0
+
 #define MAX_SCM_ARGS 10
 #define N_EXT_SCM_ARGS 7
 #define FIRST_EXT_ARG_IDX 3
@@ -1339,8 +1341,10 @@ int qseecom_tz_init()
 	struct qsee_apps_region_info_ireq req;
 	struct qseecom_command_scm_resp resp;
 	int rc = GENERIC_ERROR;
+#if ENABLE_TZ_LOGGING
 	/* register log buffer scm request */
 	void *buf = NULL;
+#endif
 	/* Register app region with TZ */
 	req.qsee_cmd_id = QSEE_APP_REGION_NOTIFICATION;
 	req.addr = APP_REGION_ADDR;
@@ -1354,6 +1358,7 @@ int qseecom_tz_init()
 			rc, req.addr, req.size);
 	if (rc)
 		goto err;
+#if ENABLE_TZ_LOGGING
 	buf = memalign(PAGE_SIZE, ROUNDUP(QSEE_LOG_BUF_SIZE, PAGE_SIZE));
 	if (!buf) {
 		rc = GENERIC_ERROR;
@@ -1373,6 +1378,7 @@ int qseecom_tz_init()
 			rc, logbuf_req.phy_addr, logbuf_req.len);
 	if (rc)
 		goto err;
+#endif
 err:
 	if (!rc) {
 		qseecom.qseecom_tz_init_done = 1;
