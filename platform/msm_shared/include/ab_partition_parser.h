@@ -73,6 +73,7 @@ void partition_switch_slots(int old_slot, int new_slot, boolean reset_success_bi
 void partition_deactivate_slot(int slot); /* Mark slot unbootable and reset other attributes*/
 void partition_activate_slot(int slot);	 /* Mark slot bootable and set other attributes*/
 int partition_find_boot_slot();		/* Find bootable partition */
+void handle_active_slot_unbootable(); /*Handle unbootable slot*/
 int partition_find_active_slot();	/* Find current active partition*/
 int partition_fill_partition_meta();	/* Fill partition slot info meta*/
 

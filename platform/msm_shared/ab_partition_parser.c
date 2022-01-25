@@ -322,8 +322,7 @@ int partition_find_active_slot()
 #endif
 			if (boot_priority == current_priority)
 			{
-				if (current_active_bit &&
-					current_bootable_bit)
+				if (current_active_bit)
 				{
 #ifdef AB_DEBUG
 	dprintf(INFO, "Slot (%s) is Valid High Priority Slot\n", SUFFIX_SLOT(i));
@@ -368,11 +367,46 @@ next_active_bootable_slot(struct partition_entry *ptn_entry)
 	return INVALID;
 }
 
-int partition_find_boot_slot()
+void handle_active_slot_unbootable()
 {
 	int boot_slot, next_slot;
 	int slt_index;
+	bool bootable, success;
+	struct partition_entry *partition_entries = partition_get_partition_entries();
+
+	boot_slot = partition_find_active_slot();
+	if (boot_slot == INVALID)
+		goto out;
+
+	/* Mark slot invalid and unbootable */
+	partition_deactivate_slot(boot_slot);
+
+	next_slot = next_active_bootable_slot(partition_entries);
+	if (next_slot == INVALID) {
+		return;
+	}
+
+	slt_index = boot_slot_index[next_slot];
+
+	bootable = slot_is_bootable(partition_entries, slt_index);
+	success = slot_is_sucessful(partition_entries, slt_index);
+
+	if (bootable == true && success == true)
+	{
+		partition_switch_slots(boot_slot, next_slot, false);
+		reboot_device(0);
+	}
+
+out:
+	return;
+}
+
+int partition_find_boot_slot()
+{
+	int boot_slot;
+	int slt_index;
 	uint64_t boot_retry_count;
+	bool bootable, success;
 	struct partition_entry *partition_entries = partition_get_partition_entries();
 
 	boot_retry_count = 0;
@@ -383,45 +417,32 @@ int partition_find_boot_slot()
 
 	slt_index = boot_slot_index[boot_slot];
 
-	/*  Boot if partition flag is set to sucessful */
-	if (partition_entries[slt_index].attribute_flag & PART_ATT_SUCCESSFUL_VAL)
-		goto out;
-
+	bootable = slot_is_bootable(partition_entries, slt_index);
+	success = slot_is_sucessful(partition_entries, slt_index);
 	boot_retry_count = slot_retry_count(partition_entries, slt_index);
-
 #ifdef AB_DEBUG
 	dprintf(INFO, "Boot Partition:RetryCount %s:%lld\n", partition_entries[slt_index].name,
 							boot_retry_count);
 #endif
-	if (!boot_retry_count)
-	{
-		/* Mark slot invalid and unbootable */
-		partition_deactivate_slot(boot_slot);
+    if (bootable == true && success == true) {
+#ifdef AB_DEBUG
+	dprintf(INFO, "Active Slot %s is bootable\n", SUFFIX_SLOT(boot_slot));
+#endif
+	} else if (bootable == true && success == false && boot_retry_count > 0) {
+	/* Do normal boot */
+	/* Decrement retry count */
+	partition_entries[slt_index].attribute_flag =
+				(partition_entries[slt_index].attribute_flag
+				& ~PART_ATT_MAX_RETRY_COUNT_VAL)
+				| ((boot_retry_count-1) << PART_ATT_MAX_RETRY_CNT_BIT);
 
-		next_slot = next_active_bootable_slot(partition_entries);
-		if (next_slot != INVALID)
-		{
-			partition_switch_slots(boot_slot, next_slot, false);
-			reboot_device(0);
-		}
-		else
-		{
-			boot_slot = INVALID;
-		}
-	}
-	else
-	{
-		/* Do normal boot */
-		/* Decrement retry count */
-		partition_entries[slt_index].attribute_flag =
-					(partition_entries[slt_index].attribute_flag
-					& ~PART_ATT_MAX_RETRY_COUNT_VAL)
-					| ((boot_retry_count-1) << PART_ATT_MAX_RETRY_CNT_BIT);
-
-		if (!attributes_updated)
-			attributes_updated = true;
-
-		goto out;
+	if (!attributes_updated)
+		attributes_updated = true;
+	} else {
+#ifdef AB_DEBUG
+	dprintf(INFO, "Slot %s is unbootable, trying alternate slot\n", SUFFIX_SLOT(boot_slot));
+#endif
+	handle_active_slot_unbootable();
 	}
 
 out:
