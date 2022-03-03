@@ -799,3 +799,15 @@ void target_crypto_init_params()
 	ce_params.do_bam_init      = 0;
 	crypto_init_params(&ce_params);
 }
+
+uint32_t is_user_force_reset(void)
+{
+	uint8_t warm_reset_reason1 = pm8x41_get_pon_warmboot_status1();
+
+	dprintf(SPEW, "warm_reset_reason1: %d\n", warm_reset_reason1);
+	
+	if (warm_reset_reason1 == RESIN)
+		return 1;
+	else
+		return 0;
+}

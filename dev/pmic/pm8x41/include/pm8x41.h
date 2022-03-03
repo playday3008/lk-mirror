@@ -85,6 +85,7 @@ enum PM8X41_VERSIONS
 /*Target power off reasons*/
 #define KPDPWR_AND_RESIN        32
 #define STAGE3                  128
+#define RESIN					64
 
 struct pm8x41_gpio {
 	int direction;
@@ -232,6 +233,7 @@ uint8_t pm8x41_get_pon_reason();
 uint8_t pm8950_get_pon_reason();
 uint8_t pm8x41_get_pon_poff_reason1();
 uint8_t pm8x41_get_pon_poff_reason2();
+uint8_t pm8x41_get_pon_warmboot_status1();
 uint32_t pm8x41_get_pwrkey_is_pressed();
 void pm8x41_config_output_mpp(struct pm8x41_mpp *mpp);
 void pm8x41_enable_mpp(struct pm8x41_mpp *mpp, enum mpp_en_ctl enable);

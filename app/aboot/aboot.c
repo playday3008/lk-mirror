@@ -4461,7 +4461,8 @@ void aboot_init(const struct app_descriptor *app)
 			(keys_get_state(KEY_BACK) || keys_get_state(KEY_VOLUMEDOWN)))
 			boot_into_fastboot = true;
 	}
-	#if NO_KEYPAD_DRIVER
+	/*Disabling fastboot_trigger call to fix the cold boot issue*/
+	#if 0
 	if (fastboot_trigger())
 		boot_into_fastboot = true;
 	#endif

@@ -608,6 +608,11 @@ uint8_t pm8x41_get_pon_poff_reason2()
 	return REG_READ(PON_POFF_REASON2);
 }
 
+uint8_t pm8x41_get_pon_warmboot_status1()
+{
+	return REG_READ(PON_WARMBOOT_STATUS1);
+}
+
 void pm8x41_enable_mvs(struct pm8x41_mvs *mvs, enum mvs_en_ctl enable)
 {
 	ASSERT(mvs);
@@ -633,7 +638,7 @@ void pm8x41_config_output_mpp(struct pm8x41_mpp *mpp)
 
 uint8_t pm8x41_get_is_cold_boot()
 {
-	if (REG_READ(PON_WARMBOOT_STATUS1) || REG_READ(PON_WARMBOOT_STATUS2)) {
+	if (REG_READ(PON_WARMBOOT_STATUS1)) {
 		dprintf(INFO,"%s: Warm boot\n", __func__);
 		return 0;
 	}
