@@ -236,6 +236,7 @@ void target_baseband_detect(struct board_data *board)
 	case MDM9206:
 	case MDM9307:
 	case MDM9628:
+	case MDM9628AQ:
 		board->baseband = BASEBAND_MDM;
         break;
 	default:
