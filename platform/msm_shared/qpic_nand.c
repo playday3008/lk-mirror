@@ -1885,8 +1885,6 @@ nand_result_t qpic_nand_read(uint32_t start_page, uint32_t num_pages,
 		ret = qpic_nand_read_page(start_page + i, buffer + flash.page_size * i,
 				spareaddr);
 		i++;
-		if (ret == NANDC_RESULT_BAD_PAGE)
-			qpic_nand_mark_badblock(start_page + i);
 		if (ret) {
 			dprintf(CRITICAL,
 					"qpic_nand_read: reading page %d failed with %d err\n",
