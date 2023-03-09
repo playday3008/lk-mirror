@@ -28,40 +28,6 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted (subject to the limitations in the
- * disclaimer below) provided that the following conditions are met:
- *
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *
- *    * Redistributions in binary form must reproduce the above
- *      copyright notice, this list of conditions and the following
- *      disclaimer in the documentation and/or other materials provided
- *      with the distribution.
- *
- *    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
- * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
- * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
 #include <app.h>
@@ -3051,59 +3017,35 @@ void cmd_flash_meta_img(const char *arg, void *data, unsigned sz)
 	return;
 }
 
-static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t offset);
-
 void cmd_flash_mmc_sparse_img(const char *arg, void *data, unsigned sz)
 {
 	unsigned int chunk;
 	uint64_t chunk_data_sz;
 	uint32_t *fill_buf = NULL;
 	uint32_t fill_val;
-	uint32_t fill_sz;
 	uint32_t blk_sz_actual = 0;
 	sparse_header_t *sparse_header;
 	chunk_header_t *chunk_header;
 	uint32_t total_blocks = 0;
-	unsigned long long emmc_ptn = 0;
+	unsigned long long ptn = 0;
 	unsigned long long size = 0;
 	int index = INVALID_PTN;
 	uint32_t i;
 	uint8_t lun = 0;
 	/*End of the sparse image address*/
 	uintptr_t data_end = (uintptr_t)data + sz;
-	struct ptable *nand_ptable;
-	struct ptentry *nand_ptn;
 
-	if (target_is_emmc_boot()) {
-		index = partition_get_index(arg);
-		emmc_ptn = partition_get_offset(index);
-
-		if(emmc_ptn == 0) {
-			fastboot_fail("partition table doesn't exist");
-			return;
-		}
-
-		size = partition_get_size(index);
-		lun = partition_get_lun(index);
-		mmc_set_lun(lun);
+	index = partition_get_index(arg);
+	ptn = partition_get_offset(index);
+	if(ptn == 0) {
+		fastboot_fail("partition table doesn't exist");
+		return;
 	}
-	else {
-		nand_ptable = flash_get_ptable();
-		if (nand_ptable == NULL) {
-			fastboot_fail("partition table doesn't exist");
-			 return;
-		}
 
-		nand_ptn = ptable_find(nand_ptable, arg);
+	size = partition_get_size(index);
 
-		if (nand_ptn == NULL) {
-			dprintf(INFO, "unknown partition name (%s). Trying updatevol\n",
-			arg);
-			fastboot_fail("unknown partition");
-			return;
-		}
-		size = validate_partition_size(nand_ptn);
-	}
+	lun = partition_get_lun(index);
+	mmc_set_lun(lun);
 
 	if (sz < sizeof(sparse_header_t)) {
 		fastboot_fail("size too low");
@@ -3203,12 +3145,7 @@ void cmd_flash_mmc_sparse_img(const char *arg, void *data, unsigned sz)
 			/* chunk_header->total_sz is uint32,So chunk_data_sz is now less than 2^32
 			   otherwise it will return in the line above
 			 */
-			if (!target_is_emmc_boot()) {
-				if (cmd_flash_nand(arg, data, chunk_data_sz,
-						(uint64_t)total_blocks*sparse_header->blk_sz))
-					return;
-			}
-			else if (mmc_write(emmc_ptn + ((uint64_t)total_blocks*sparse_header->blk_sz),
+			if(mmc_write(ptn + ((uint64_t)total_blocks*sparse_header->blk_sz),
 						(uint32_t)chunk_data_sz,
 						(unsigned int*)data))
 			{
@@ -3239,13 +3176,7 @@ void cmd_flash_mmc_sparse_img(const char *arg, void *data, unsigned sz)
 				return;
 			}
 
-			if (target_is_emmc_boot())
-				fill_sz = blk_sz_actual;
-			else
-				fill_sz = ROUNDUP(sparse_header->blk_sz * chunk_header->chunk_sz, CACHE_LINE);
-
-			fill_buf = (uint32_t *)memalign(CACHE_LINE, fill_sz);
-
+			fill_buf = (uint32_t *)memalign(CACHE_LINE, blk_sz_actual);
 			if (!fill_buf)
 			{
 				fastboot_fail("Malloc failed for: CHUNK_TYPE_FILL");
@@ -3260,7 +3191,7 @@ void cmd_flash_mmc_sparse_img(const char *arg, void *data, unsigned sz)
 			fill_val = *(uint32_t *)data;
 			data = (char *) data + sizeof(uint32_t);
 
-			for (i = 0; i < (fill_sz / sizeof(fill_val)); i++)
+			for (i = 0; i < (sparse_header->blk_sz / sizeof(fill_val)); i++)
 			{
 				fill_buf[i] = fill_val;
 			}
@@ -3282,16 +3213,7 @@ void cmd_flash_mmc_sparse_img(const char *arg, void *data, unsigned sz)
 					return;
 				}
 
-				if (!target_is_emmc_boot()) {
-					if (cmd_flash_nand(arg, fill_buf,
-						sparse_header->blk_sz * chunk_header->chunk_sz,
-							(uint64_t)total_blocks*sparse_header->blk_sz))
-						return;
-
-					total_blocks += chunk_header->chunk_sz;
-					break;
-				}
-				else if (mmc_write(emmc_ptn + ((uint64_t)total_blocks*sparse_header->blk_sz),
+				if(mmc_write(ptn + ((uint64_t)total_blocks*sparse_header->blk_sz),
 							sparse_header->blk_sz,
 							fill_buf))
 				{
@@ -3355,7 +3277,7 @@ void cmd_flash_mmc_sparse_img(const char *arg, void *data, unsigned sz)
 	return;
 }
 
-void cmd_flash_mmc_nand(const char *arg, void *data, unsigned sz)
+void cmd_flash_mmc(const char *arg, void *data, unsigned sz)
 {
 	sparse_header_t *sparse_header;
 	meta_header_t *meta_header;
@@ -3366,9 +3288,6 @@ void cmd_flash_mmc_nand(const char *arg, void *data, unsigned sz)
 	int              ret=0;
 	uint32           major_version=0;
 	uint32           minor_version=0;
-
-	if (!target_is_emmc_boot())
-		goto flash_imgs;
 
 	ret = scm_svc_version(&major_version,&minor_version);
 	if(!ret)
@@ -3431,9 +3350,6 @@ void cmd_flash_mmc_nand(const char *arg, void *data, unsigned sz)
 	}
 #endif /* SSD_ENABLE */
 
-	if (!target_is_emmc_boot())
-		goto flash_imgs;
-
 #if VERIFIED_BOOT
 	if (target_build_variant_user())
 	{
@@ -3458,16 +3374,10 @@ void cmd_flash_mmc_nand(const char *arg, void *data, unsigned sz)
 	}
 #endif
 
-flash_imgs:
 	sparse_header = (sparse_header_t *) data;
 	meta_header = (meta_header_t *) data;
 	if (sparse_header->magic == SPARSE_HEADER_MAGIC)
 		cmd_flash_mmc_sparse_img(arg, data, sz);
-	else if (!target_is_emmc_boot()) {
-		if (!cmd_flash_nand(arg, data, sz, 0))
-			fastboot_okay("");
-		return;
-	}
 	else if (meta_header->magic == META_HEADER_MAGIC)
 		cmd_flash_meta_img(arg, data, sz);
 	else
@@ -3511,11 +3421,7 @@ void cmd_updatevol(const char *vol_name, void *data, unsigned sz)
 		fastboot_okay("");
 }
 
-/*The caller ought to decide when to send fastboot OKAY.
-If the functoin return -1, the fastboot FAIL with reson is
-already sent via this function.*/
-
-static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t offset)
+void cmd_flash_nand(const char *arg, void *data, unsigned sz)
 {
 	struct ptentry *ptn;
 	struct ptable *ptable;
@@ -3526,13 +3432,13 @@ static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t off
 
 	if((uintptr_t)data > (UINT_MAX - sz)) {
 		fastboot_fail("Cannot flash: image header corrupt");
-                return -1;
+                return;
         }
 
 	ptable = flash_get_ptable();
 	if (ptable == NULL) {
 		fastboot_fail("partition table doesn't exist");
-		return -1;
+		return;
 	}
 
 	ptn = ptable_find(ptable, arg);
@@ -3540,7 +3446,7 @@ static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t off
 		dprintf(INFO, "unknown partition name (%s). Trying updatevol\n",
 				arg);
 		cmd_updatevol(arg, data, sz);
-		return -1;
+		return;
 	}
 
 	if (!strcmp(ptn->name, "boot") || !strcmp(ptn->name, "recovery")) {
@@ -3548,7 +3454,7 @@ static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t off
 			dprintf(INFO, "Verified the BOOT_MAGIC in image header  \n");
 		} else {
 			fastboot_fail("Image is not a boot image");
-			return -1;
+			return;
 		}
 	}
 
@@ -3564,12 +3470,12 @@ static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t off
 		if (bytes_to_round_page) {
 			if (((uintptr_t)data + sz ) > (UINT_MAX - bytes_to_round_page)) {
 				fastboot_fail("Integer overflow detected");
-				return -1;
+				return;
 			}
 			if (((uintptr_t)data + sz + bytes_to_round_page) >
 				((uintptr_t)target_get_scratch_address() + target_get_max_flash_size())) {
 				fastboot_fail("Buffer size is not aligned to page_size");
-				return -1;
+				return;
 			}
 			else {
 				memset(data + sz, 0, bytes_to_round_page);
@@ -3583,25 +3489,24 @@ static int cmd_flash_nand(const char *arg, void *data, unsigned sz, uint64_t off
 
 	if (sz > partition_size) {
 		fastboot_fail("Image size too large");
-		return -1;
+		return;
 	}
 
 	dprintf(INFO, "writing %d bytes to '%s'\n", sz, ptn->name);
-	if (((sz > UBI_EC_HDR_SIZE) &&
-		(!memcmp((void *)data, UBI_MAGIC, UBI_MAGIC_SIZE))) ||
-			ptn->private) {
-		if (flash_ubi_img(ptn, data, sz, offset)) {
+	if ((sz > UBI_EC_HDR_SIZE) &&
+		(!memcmp((void *)data, UBI_MAGIC, UBI_MAGIC_SIZE))) {
+		if (flash_ubi_img(ptn, data, sz)) {
 			fastboot_fail("flash write failure");
-			return -1;
+			return;
 		}
 	} else {
 		if (flash_write(ptn, extra, data, sz)) {
 			fastboot_fail("flash write failure");
-			return -1;
+			return;
 		}
 	}
 	dprintf(INFO, "partition '%s' updated\n", ptn->name);
-	return 0;
+	fastboot_okay("");
 }
 
 
@@ -3618,7 +3523,10 @@ static inline uint64_t validate_partition_size(struct ptentry *ptn)
 
 void cmd_flash(const char *arg, void *data, unsigned sz)
 {
-	cmd_flash_mmc_nand(arg, data, sz);
+	if(target_is_emmc_boot())
+		cmd_flash_mmc(arg, data, sz);
+	else
+		cmd_flash_nand(arg, data, sz);
 }
 
 void cmd_continue(const char *arg, void *data, unsigned sz)

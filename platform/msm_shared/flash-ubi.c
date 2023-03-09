@@ -24,41 +24,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted (subject to the limitations in the
- * disclaimer below) provided that the following conditions are met:
- *
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *
- *    * Redistributions in binary form must reproduce the above
- *      copyright notice, this list of conditions and the following
- *      disclaimer in the documentation and/or other materials provided
- *      with the distribution.
- *
- *    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
- * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
- * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
 #include <stdlib.h>
@@ -830,112 +795,6 @@ static void remove_F_flag(const void *leb_data)
 }
 
 /**
-* While supporting the images sent via split from fastboot in sparsed format,
-* several sparse images, each containing part of the original images splitted
-* by the flashing tool(fastboot) are expected. It is essential to expect the data
-* received not to be alligned with erase block(EB). So we have to handle following
-* tricky situations:
-* 1. Data received may not be EB size alligned, and may be less or larger than EB size itself.
-* 2. Several sparsed images can come, with each containing part of the orignal image. It means
-* we have to maintain certain context, which is used for any subsequent sparsed image.
-* 3. This function is called for sparsed/non sparsed flashing of UBI images. So, backward
-* compatibility is to be taken care of.
-**/
-
-struct ubi_flash_context{
-	uint32_t curr_peb;
-	int bad_blocks_cnt;
-	struct ubi_scan_info *si;
-	unsigned buff_sz;
-	void *buff;
-};
-
-/**
-*Free the context stored. Shouldn't normally called untill some ongoing session
-*has been interrupted and restarted.
-**/
-static void flash_ubi_clean_ctx(struct ubi_flash_context *ctx)
-{
-	if (ctx){
-		if (ctx->buff)
-			free(ctx->buff);
-		if (ctx->si) {
-			free(ctx->si->pebs_data);
-			free(ctx->si);
-		}
-		free(ctx);
-	}
-}
-/**
-*It appends the data received to the residual buffer from previous sessions.
-* We can't flash any data untill we get atleast one eraze block(EB) size. Hence, in
-* of small chunks recevived or, data received unalligned to EB size, we need to keep
-* it accumulating in residual buffer.
-**/
-static uint32_t flash_ubi_appnd_res_buffer(struct ubi_flash_context *ctx, uint64_t size,
-							unsigned eb_sz, void *data)
-{
-	if (ctx && ctx->buff_sz) {
-		size = (size < ( eb_sz - ctx->buff_sz)) ? size : (eb_sz - ctx->buff_sz);
-		memcpy(ctx->buff + ctx->buff_sz, data, size);
-		ctx->buff_sz += size;
-		return size;
-	}
-	return 0;
-}
-
-/**
-*Create new context. Should happen when first chunk with offset 0 arrives.
-*/
-static int flash_ubi_create_ctx(struct ptentry *ptn,  struct ubi_scan_info *si)
-{
-	struct ubi_flash_context *ctx = (struct ubi_flash_context *)ptn->private;
-
-        flash_ubi_clean_ctx(ctx);
-        ctx = malloc(sizeof(struct ubi_flash_context));
-        if (!ctx) {
-                  dprintf(CRITICAL, "flash_ubi_img: malloc failure for context\n");
-                 return -1;
-        }
-	ctx->si = si;
-        ptn->private = ctx;
-        ctx->buff = NULL;
-        ctx->buff_sz = 0;
-	return 0;
-}
-
-/**
-*Save the context. We ought to save parameters like current physical erase block
-*, number of bad blocks, scanned ubi info etc.
-**/
-static int flash_ubi_save_ctx(struct ptentry *ptn, uint32_t curr_peb, void *img_peb,
-			int bad_blocks_cnt, unsigned block_size,  unsigned size)
-{
-	struct ubi_flash_context *ctx = (struct ubi_flash_context *)ptn->private;
-
-	if (size >= block_size) {
-		dprintf(CRITICAL, "flash_ubi_img: unexpected size %d bz %d\n", size, block_size);
-		return -1;
-	}
-
-        ctx->curr_peb = curr_peb;
-        ctx->bad_blocks_cnt = bad_blocks_cnt;
-        if (size) {
-		if (!ctx->buff)
-			ctx->buff = malloc(block_size);
-
-                if (!ctx->buff || ctx->buff_sz) {
-			dprintf(CRITICAL, "flash_ubi_save_ctx:  malloc %s or buff sz abnormal %d\n",
-				ctx->buff ? "passed": "failed", ctx->buff_sz);
-                        return -1;
-                }
-
-                memcpy(ctx->buff + ctx->buff_sz, img_peb, size);
-        }
-        ctx->buff_sz += size;
-	return 0;
-}
-/**
  * flash_ubi_img() - Write the provided (UBI) image to given partition
  * @ptn: partition to write the image to
  * @data: the image to write
@@ -945,30 +804,23 @@ static int flash_ubi_save_ctx(struct ptentry *ptn, uint32_t curr_peb, void *img_
  * -1 - in case of error
  *  0 - on success
  */
-int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offset)
+int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size)
 {
 	struct ubi_scan_info *si;
 	struct ubi_ec_hdr *old_ech;
-	uint32_t curr_peb;
+	uint32_t curr_peb = ptn->start;
 	void *img_peb;
 	unsigned page_size = flash_page_size();
 	unsigned block_size = flash_block_size();
 	int num_pages_per_blk = block_size / page_size;
 	int num_pages;
-	int ret = 0;
+	int ret;
 	int bad_blocks_cnt = 0;
-	int32_t fmsb_peb = UINT_MAX;
+	uint32_t fmsb_peb = UINT_MAX;
 	int is_fmsb_peb_valid = 0;
 	unsigned peb_valid_sz= 0;
-	unsigned sz_change;
-	struct ubi_flash_context *ctx = (struct ubi_flash_context *)ptn->private;
 
-	/*We have saved context?*/
-	if (ctx && offset)
-		si = ctx->si;
-	else
-		si = scan_partition(ptn);
-
+	si = scan_partition(ptn);
 	if (!si) {
 		dprintf(CRITICAL, "flash_ubi_img: scan_partition failed\n");
 		return -1;
@@ -985,34 +837,7 @@ int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offse
 	}
 
 	/* Update the "to be" flashed image and flash it */
-	if (ctx && offset) {
-
-		if (ctx->buff_sz >= block_size) {
-			dprintf(CRITICAL, "flash_ubi_img: wrong buff_sz : 0x%x offset: 0x%llx block_sz: 0x%x \n",
-						ctx->buff_sz , offset, block_size);
-			return -1;
-		}
-		sz_change = flash_ubi_appnd_res_buffer(ctx, size, block_size, data);
-		data = (char *)data + sz_change;
-		size -= sz_change;
-		curr_peb = ctx->curr_peb;
-		bad_blocks_cnt = ctx->bad_blocks_cnt;
-	}
-	else
-	{
-		curr_peb = ptn->start;
-                bad_blocks_cnt = 0;
-
-	}
-
-	img_peb = (offset && ctx && ctx->buff && ctx->buff_sz) ? ctx->buff : data;
-
-	dprintf(INFO, "start cur_peb: %d offset: 0x%llx ctx: 0x%p ctx buff_sz: 0x%x\n",
-                                curr_peb, offset, ctx , ctx ? ctx->buff_sz: 0);
-
-	/*update total size = currently received + residual*/
-	size = size + (ctx ? ctx->buff_sz : 0);
-
+	img_peb = data;
 	while (size && curr_peb < ptn->start + ptn->length) {
 		if (qpic_nand_blk_erase(curr_peb * num_pages_per_blk)) {
 			dprintf(CRITICAL, "flash_ubi_img: erase of %d failed\n",
@@ -1022,9 +847,8 @@ int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offse
 			continue;
 		}
 
-		if (size < block_size) {
-			break;
-		}
+		if (size < block_size)
+			num_pages = size / page_size;
 		else
 			num_pages = calc_data_len(page_size, img_peb, block_size);
 
@@ -1034,8 +858,7 @@ int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offse
 		if (size < UBI_MAGIC_SIZE)
 		{
 			dprintf(CRITICAL, "flash_ubi_img: invalid size provided.\n");
-			ret = -1;
-			break;
+			return -1;
 		}
 
 		/*
@@ -1046,15 +869,13 @@ int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offse
 			BE32(((struct ubi_ec_hdr *)img_peb)->data_offset) > peb_valid_sz)
 		{
 			dprintf(CRITICAL, "flash_ubi_img: invalid image peb found\n");
-			ret = -1;
-			break;
+			return -1;
 		}
 
 		remove_F_flag(img_peb);
 		/* Update the ec_header in the image */
 		old_ech = (struct ubi_ec_hdr *)img_peb;
 		update_ec_header(old_ech, si, curr_peb - ptn->start, false);
-
 		/* Write one block from image */
 		ret = qpic_nand_write(curr_peb * num_pages_per_blk,
 				num_pages, img_peb, 0);
@@ -1065,67 +886,32 @@ int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offse
 			curr_peb++;
 			continue;
 		}
+		if (size < block_size)
+			size = 0;
+		else
+			size -= block_size;
 
 		if (fastmap_present(img_peb)) {
 			fmsb_peb = curr_peb;
 			is_fmsb_peb_valid = 1;
 		}
-		/*Flashed residual buffer.*/
-		if (ctx && ctx->buff && ctx->buff_sz) {
-			img_peb = data;
-			ctx->buff_sz = 0;
-		}
-		else
-			img_peb += flash_block_size();
-
-		size -= block_size;
+		img_peb += flash_block_size();
 		curr_peb++;
 	}
 
-	if (size && !(curr_peb < ptn->start + ptn->length)) {
+	if (size) {
 		dprintf(CRITICAL,
 				"flash_ubi_img: Not enough good blocks to flash image!");
 		ret = -1;
 		goto out;
 	}
 
+	/* Erase and write ec_header for the rest of the blocks */
+	for (; curr_peb < ptn->start + ptn->length; curr_peb++)
+		if (ubi_erase_peb(curr_peb, si, ptn->start))
+			bad_blocks_cnt++;
+
 	ret = 0;
-
-	/*Either we don't have sufficient data that can be flashed
-	when ctx buff_sz + received data buffer <= EBZ.
-	Else, we got atleast one EBZ flashed. Means ctx buff_sz is zero.
-	In 1st case size -= ctx->buff_sz will be 0, so nothing will be
-	stored in ctx buffer. In second case,  ctx->buff_sz will be zero,
-	so total size belongs to data buffer received.*/
-	if (ctx)
-		size -= ctx->buff_sz;
-
-	if (!offset) {
-		ret = flash_ubi_create_ctx(ptn, si);
-		if (ret)
-			goto out;
-		ret = flash_ubi_save_ctx(ptn, curr_peb,  img_peb, bad_blocks_cnt, block_size, size);
-		if (ret)
-			goto out;
-
-		dprintf(INFO, "flash_ubi_img: erase remaining block from %d\n",
-			curr_peb);
-		/* Erase and write ec_header for the rest of the blocks */
-		for (; curr_peb < ptn->start + ptn->length; curr_peb++)
-			if (ubi_erase_peb(curr_peb, si, ptn->start))
-				bad_blocks_cnt++;
-	}
-	else if (ctx) {
-		ret = flash_ubi_save_ctx(ptn, curr_peb, img_peb, bad_blocks_cnt, block_size, size);
-		if (ret)
-			goto out;
-	}
-	else {
-		dprintf(INFO, "flash_ubi_img: no context and offset non null\n");
-		ret = -1;
-		goto out;
-	}
-
 	/*
 	 * If flashed image contains fastmap data and bad blocks were found
 	 * we need to invalidate the flashed fastmap since it isn't accurate
@@ -1138,16 +924,8 @@ int flash_ubi_img(struct ptentry *ptn, void *data, unsigned size, uint64_t offse
 	}
 
 out:
-	/* Either we are in normal mode, or split_exit mode, and got an error.
-	** Eitherway, clean the context and end the split mode */
-	if (ret){
-		flash_ubi_clean_ctx(ctx);
-		ptn->private = NULL;
-	}
-
-	if (ret)
-		dprintf(CRITICAL, "flash_ubi_img: ret error %d\n",ret);
-
+	free(si->pebs_data);
+	free(si);
 	return ret;
 }
 
