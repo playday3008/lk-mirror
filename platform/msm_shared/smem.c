@@ -36,6 +36,8 @@
 
 #include "smem.h"
 
+#include "qc_version.h"
+
 static struct smem *smem;
 
 const char *hw_platform[] = {
@@ -57,7 +59,6 @@ const char *hw_platform[] = {
 	[HW_PLATFORM_SBC] = "SBC",
 };
 
-static char *qc_version  = "09:ABOOT.OW.1.0-00001-M9655";
 
 /* DYNAMIC SMEM REGION feature enables LK to dynamically
  * read the SMEM addr info from TCSR register or IMEM location.
