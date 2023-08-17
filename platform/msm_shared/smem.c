@@ -57,6 +57,8 @@ const char *hw_platform[] = {
 	[HW_PLATFORM_SBC] = "SBC",
 };
 
+static char *qc_version  = "09:ABOOT.OW.1.0-00001-M9655";
+
 /* DYNAMIC SMEM REGION feature enables LK to dynamically
  * read the SMEM addr info from TCSR register or IMEM location.
  * The first word read, if indicates a MAGIC number, then
@@ -193,7 +195,6 @@ smem_read_alloc_entry_offset(smem_mem_type_t type, void *buf, int len,
 
 void image_version(void)
 {
-  char *qc_version  = "09:ABOOTTST.1.3.1-04210-9x50-1";
   uint32 smem_block_size = NULL;
   void *smem_image_addr = NULL;
 
