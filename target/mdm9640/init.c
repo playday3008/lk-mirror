@@ -58,6 +58,7 @@
 #include <crypto5_wrapper.h>
 #include <rpm-glink.h>
 
+extern void image_version(void);
 extern void smem_ptable_init(void);
 extern void smem_add_modem_partitions(struct ptable *flash_ptable);
 void target_sdc_init();
@@ -215,6 +216,8 @@ void target_init(void)
 		update_ptable_names();
 		flash_set_ptable(&flash_ptable);
 	}
+
+  image_version();
 
 	if (target_use_signed_kernel())
 		target_crypto_init_params();

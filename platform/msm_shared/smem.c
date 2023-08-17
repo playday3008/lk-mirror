@@ -191,6 +191,31 @@ smem_read_alloc_entry_offset(smem_mem_type_t type, void *buf, int len,
 	return 0;
 }
 
+void image_version(void)
+{
+  char *qc_version  = "09:ABOOTTST.1.3.1-04210-9x50-1";
+  uint32 smem_block_size = NULL;
+  void *smem_image_addr = NULL;
+
+  smem_image_addr = smem_get_alloc_entry(SMEM_IMAGE_VERSION_TABLE, &smem_block_size);
+
+  if (smem_image_addr == NULL)
+  {
+    dprintf(CRITICAL, "Error reading the smem image version table address\n");
+    ASSERT(0);
+  }
+
+  if (SMEM_IMAGE_VERSION_TABLE_SIZE != smem_block_size)
+  {
+    dprintf(CRITICAL, "Error image version table size is wrong\n");
+    ASSERT(0);
+  }
+
+  smem_image_addr += SMEM_IMAGE_VERSION_PARTITION_APPSSBL * SMEM_IMAGE_VERSION_SINGLE_BLOCK_SIZE;
+
+  strlcpy(smem_image_addr, qc_version , SMEM_IMAGE_VERSION_NAME_SIZE);
+}
+
 size_t smem_get_hw_platform_name(void *buf, uint32 buf_size)
 {
 	uint32 hw_id;
