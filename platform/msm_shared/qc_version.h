@@ -6,10 +6,10 @@
   OVERVIEW:    This header file contains APPS Image version string
 
   DEPENDENCIES: - None
+  
+  Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause-Clear
 
-    Copyright (c) 2022 Qualcomm Technologies, Inc.
-    All Rights Reserved.
-    Confidential and Proprietary - Qualcomm Technologies, Inc.
 ==============================================================================*/
 
 #include <sys/types.h>
