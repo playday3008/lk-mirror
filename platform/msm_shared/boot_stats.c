@@ -46,12 +46,19 @@ void bs_set_timestamp(enum bs_entry bs_id)
 
 		if (bs_id == BS_KERNEL_LOAD_START) {
 			kernel_load_start = platform_get_sclk_count();
+			if(kernel_load_start){
+				writel(kernel_load_start,
+					bs_imem + (sizeof(uint32_t) * bs_id));
+			}
 			return;
 		}
 
 		if(bs_id == BS_KERNEL_LOAD_DONE){
 			clk_count = platform_get_sclk_count();
 			if(clk_count){
+				writel(clk_count,
+					bs_imem + (sizeof(uint32_t) * BS_KERNEL_LOAD_DONE));
+				clk_count = platform_get_sclk_count();
 				writel(clk_count - kernel_load_start,
 					bs_imem + (sizeof(uint32_t) * BS_KERNEL_LOAD_TIME));
 			}
