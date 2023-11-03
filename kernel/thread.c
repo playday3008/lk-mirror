@@ -314,9 +314,7 @@ void thread_resched(void)
 
 	newthread = list_remove_head_type(&run_queue[next_queue], thread_t, queue_node);
 
-#if THREAD_CHECKS
 	ASSERT(newthread);
-#endif
 
 	if (list_is_empty(&run_queue[next_queue]))
 		run_queue_bitmap &= ~(1<<next_queue);
