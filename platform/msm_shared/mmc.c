@@ -248,7 +248,7 @@ mmc_boot_decode_and_save_csd(struct mmc_card *card, unsigned int *raw_csd)
 	unsigned int mmc_value = 0;
 	unsigned int mmc_temp = 0;
 
-	struct mmc_csd mmc_csd;
+	struct mmc_csd mmc_csd = {0};
 
 	if ((card == NULL) || (raw_csd == NULL)) {
 		return MMC_BOOT_E_INVAL;
@@ -2068,7 +2068,7 @@ static unsigned int mmc_boot_send_app_cmd(unsigned int rca)
 static unsigned int mmc_boot_sd_init_card(struct mmc_card *card)
 {
 	unsigned int i, mmc_ret;
-	unsigned int ocr_cmd_arg;
+	unsigned int ocr_cmd_arg = 0;
 	struct mmc_boot_command cmd;
 
 	memset((struct mmc_boot_command *)&cmd, 0,
@@ -2740,6 +2740,8 @@ mmc_wp(unsigned int sector, unsigned int size, unsigned char set_clear_wp)
 	}
 	else
 		return MMC_BOOT_E_FAILURE;
+
+	return MMC_BOOT_E_SUCCESS;
 }
 
 void mmc_wp_test(void)
