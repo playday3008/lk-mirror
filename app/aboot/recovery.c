@@ -98,6 +98,11 @@ int set_recovery_message(const struct recovery_message *in)
 	unsigned pagesize = flash_page_size();
 	unsigned n = 0;
 	void *scratch_addr = target_get_scratch_address();
+	if (scratch_addr == NULL)
+	{
+		dprintf(CRITICAL, "ERROR: Invalid scratch address\n");
+		return -1;
+	}
 
 	ptable = flash_get_ptable();
 
