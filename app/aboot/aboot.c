@@ -1545,6 +1545,11 @@ int boot_linux_from_mmc(void)
 	second_actual  = ROUND_TO_PAGE(hdr->second_size, page_mask);
 
 	image_addr = (unsigned char *)target_get_scratch_address();
+	if (!image_addr)
+	{
+		dprintf(CRITICAL, "ERROR: Invalid image address.\n");
+		return -1;
+	}
 #if VERIFIED_BOOT_2
 	/* Create hole in start of image for VB salt to copy */
 	image_addr += SALT_BUFF_OFFSET;
@@ -1873,6 +1878,11 @@ int boot_linux_from_mmc(void)
 
 		dprintf(INFO, "decompressing kernel image: done\n");
 		kptr = (struct kernel64_hdr *)out_addr;
+		if (!kptr)
+		{
+			dprintf(CRITICAL, "Invalid kernel image address!!!\n");
+			return -1;
+		}
 		kernel_start_addr = out_addr;
 		kernel_size = out_len;
 	} else {
@@ -2118,6 +2128,11 @@ int boot_linux_from_flash(void)
 	}
 
 	image_addr = (unsigned char *)target_get_scratch_address();
+	if (!image_addr)
+	{
+		dprintf(CRITICAL, "ERROR: Invalid image address.\n");
+		return -1;
+	}
 	memcpy(image_addr, (void *)buf, page_size);
 
 	/*
@@ -2904,6 +2919,11 @@ int copy_dtb(uint8_t *boot_image_start, unsigned int scratch_offset)
 		if (is_gzip_package(best_match_dt_addr, dt_entry.size))
 		{
 			out_addr = (unsigned char *)target_get_scratch_address() + scratch_offset;
+			if (!out_addr)
+			{
+				dprintf(CRITICAL, "ERROR: Invalid Out image address\n");
+				return -1;
+			}
 			out_avai_len = target_get_max_flash_size() - scratch_offset;
 			dprintf(INFO, "decompressing dtb: start\n");
 			rc = decompress(best_match_dt_addr,
