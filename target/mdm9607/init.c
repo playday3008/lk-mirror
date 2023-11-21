@@ -221,6 +221,7 @@ void target_detect(struct board_data *board)
 
 unsigned board_machtype(void)
 {
+	return LINUX_MACHTYPE_UNKNOWN;
 }
 
 /* Identify the baseband being used */
