@@ -60,6 +60,9 @@ status_t dpc_queue(dpc_callback cb, void *arg, uint flags)
 
 	dpc = malloc(sizeof(struct dpc));
 
+	if (!dpc)
+		return ERR_NO_MEMORY;
+
 	dpc->cb = cb;
 	dpc->arg = arg;
 	enter_critical_section();
