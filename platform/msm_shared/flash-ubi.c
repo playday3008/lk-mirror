@@ -164,14 +164,14 @@ static int read_ec_hdr(uint32_t peb, struct ubi_ec_hdr *ec_hdr)
 	int page_size = flash_page_size();
 	int num_pages_per_blk = flash_block_size()/page_size;
 
-	spare = (unsigned char *)malloc(flash_spare_size());
+	spare = (unsigned char *)calloc(1, flash_spare_size());
 	if (!spare)
 	{
 		dprintf(CRITICAL, "read_ec_hdr: Mem allocation failed\n");
 		return ret;
 	}
 
-	tmp_buf = (unsigned char *)malloc(page_size);
+	tmp_buf = (unsigned char *)calloc(1, page_size);
 	if (!tmp_buf)
 	{
 		dprintf(CRITICAL, "read_ec_hdr: Mem allocation failed\n");
@@ -257,14 +257,14 @@ static int read_vid_hdr(uint32_t peb, struct ubi_vid_hdr *vid_hdr,
 	int page_size = flash_page_size();
 	int num_pages_per_blk = flash_block_size()/page_size;
 
-	spare = (unsigned char *)malloc(flash_spare_size());
+	spare = (unsigned char *)calloc(1, flash_spare_size());
 	if (!spare)
 	{
 		dprintf(CRITICAL, "read_vid_hdr: Mem allocation failed\n");
 		return ret;
 	}
 
-	tmp_buf = (unsigned char *)malloc(page_size);
+	tmp_buf = (unsigned char *)calloc(1, page_size);
 	if (!tmp_buf)
 	{
 		dprintf(CRITICAL, "read_vid_hdr: Mem allocation failed\n");
@@ -333,14 +333,14 @@ static int read_leb_data(uint32_t peb, void *leb_data,
 	int block_size = flash_block_size();
 	int num_pages_per_blk = block_size/page_size;
 
-	spare = (unsigned char *)malloc(flash_spare_size());
+	spare = (unsigned char *)calloc(1, flash_spare_size());
 	if (!spare)
 	{
 		dprintf(CRITICAL, "read_leb_data: Mem allocation failed\n");
 		return ret;
 	}
 
-	tmp_buf = (unsigned char *)malloc(leb_size);
+	tmp_buf = (unsigned char *)calloc(1, leb_size);
 	if (!tmp_buf)
 	{
 		dprintf(CRITICAL, "read_leb_data: Mem allocation failed\n");
