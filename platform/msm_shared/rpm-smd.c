@@ -59,6 +59,9 @@ int rpm_smd_send_data(uint32_t *data, uint32_t len, msg_type type)
 	uint32_t rlen = 0;
 	void *smd_data = NULL;
 
+	if (!data)
+		return -1;
+
 	switch(type)
 	{
 		case RPM_REQUEST_TYPE:
