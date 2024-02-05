@@ -74,6 +74,9 @@ int rpm_smd_send_data(uint32_t *data, uint32_t len, msg_type type)
 			req.req_hdr.dataLength = len;
 
 			fill_kvp_object(&req.data, data, len);
+			if (!req.data)
+				return -1;
+
 			len_to_smd = req.req_hdr.dataLength + 0x28;
 
 			smd_data = (void*) malloc(len_to_smd);
